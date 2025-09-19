@@ -21,6 +21,7 @@ export type ResultContentSSSTik = {
   }
   images?: string[]
   direct?: string
+  cover?: string
 }
 
 export type AuthorSSSTik = {

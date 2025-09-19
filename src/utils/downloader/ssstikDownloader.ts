@@ -75,19 +75,52 @@ const parseImages = ($: CheerioAPI): string[] => {
   return images
 }
 
+const parseCover = ($: CheerioAPI): string | null => {
+  let coverUrl = null
+
+  // Parse <style> tags to find background-image
+  $('style').each((_, styleEl) => {
+    const cssContent = $(styleEl).html()
+    if (cssContent && cssContent.includes('#mainpicture .result_overlay')) {
+      // Look for background-image URL in the CSS
+      const bgMatch = cssContent.match(/background-image:\s*url\(([^)]+)\)/)
+      if (bgMatch && bgMatch[1]) {
+        coverUrl = bgMatch[1].trim()
+        // Remove quotes if present
+        coverUrl = coverUrl.replace(/^['"]|['"]$/g, '')
+      }
+    }
+  })
+
+  // Also check inline style as fallback
+  if (!coverUrl) {
+    const bgStyle = $('#mainpicture .result_overlay').attr('style')
+    if (bgStyle) {
+      const bgMatch = bgStyle.match(/background-image:\s*url\(([^)]+)\)/)
+      if (bgMatch && bgMatch[1]) {
+        coverUrl = bgMatch[1].trim().replace(/^['"]|['"]$/g, '')
+      }
+    }
+  }
+
+  return coverUrl
+}
+
 const createImageResponse = (
   $: CheerioAPI,
   author: AuthorSSSTik,
   statistics: StatisticsSSSTik,
   images: string[],
-  music?: string
+  music?: string,
+  cover?: string
 ): SSSTikResponse["result"] => ({
   type: "image",
   desc: $("p.maintext").text().trim(),
   author,
   statistics,
   images,
-  ...(music && { music: { playUrl: [music] } })
+  ...(music && { music: { playUrl: [music] } }),
+  ...(cover && { cover })
 })
 
 const createVideoResponse = (
@@ -95,14 +128,16 @@ const createVideoResponse = (
   author: AuthorSSSTik,
   statistics: StatisticsSSSTik,
   video: string,
-  music?: string
+  music?: string,
+  cover?: string
 ): SSSTikResponse["result"] => ({
   type: "video",
   desc: $("p.maintext").text().trim(),
   author,
   statistics,
   video: { playAddr: [video] },
-  ...(music && { music: { playUrl: [music] } })
+  ...(music && { music: { playUrl: [music] } }),
+  ...(cover && { cover })
 })
 
 const createMusicResponse = (
@@ -207,13 +242,14 @@ export const SSSTik = async (
     const music = $("a.music").attr("href")
     const direct = $("a.music_direct").attr("href")
     const images = parseImages($)
+    const cover = parseCover($)
 
     let result: SSSTikResponse["result"]
 
     if (images.length > 0) {
-      result = createImageResponse($, author, statistics, images, music)
+      result = createImageResponse($, author, statistics, images, music, cover || undefined)
     } else if (video) {
-      result = createVideoResponse($, author, statistics, video, music)
+      result = createVideoResponse($, author, statistics, video, music, cover || undefined)
     } else if (music) {
       result = createMusicResponse(music, direct)
     } else {
