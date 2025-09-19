@@ -15,6 +15,7 @@ export type ContentMusicalDown = {
   type: "video" | "image"
   author?: AuthorMusicalDown
   desc?: string
+  cover?: string
   images?: string[]
   videoHD?: string
   videoSD?: string

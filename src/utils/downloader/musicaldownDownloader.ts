@@ -83,28 +83,26 @@ const parseVideos = ($: CheerioAPI): Record<string, string> => {
   $(videoContainer)
     .find("a")
     .each((_, v) => {
-      const href = $(v).attr("href")
-      if (!href || href === "#modal2") return
+        const href = $(v).attr("href");
+        if (!href || href === "#modal2") return;
+        if (!isValidUrl(href)) return;
 
-      if (!isValidUrl(href)) return
+        const dataEvent = $(v).attr("data-event") || "";
+        const onclick = $(v).attr("onclick") || "";
 
-      const dataEvent = $(v).attr("data-event") || ""
-      const onclick = $(v).attr("onclick") || ""
-      const downloadUrl =
-        href !== undefined ? href : /downloadX\('([^']+)'\)/.exec(onclick)?.[1]
+        const downloadUrl = href !== undefined ? href : /downloadX\('([^']+)'\)/.exec(onclick)?.[1];
+        if (!downloadUrl) return;
 
-      if (!downloadUrl) return
-
-      if (dataEvent.includes("hd")) {
-        videos.videoHD = downloadUrl
-      } else if (dataEvent.includes("mp4")) {
-        videos.videoSD = downloadUrl
-      } else if (dataEvent.includes("watermark")) {
-        videos.videoWatermark = downloadUrl
-      } else if (href.includes("type=mp3")) {
-        videos.music = downloadUrl
-      }
-    })
+        if (dataEvent.includes("hd")) {
+            videos.videoHD = downloadUrl;
+        } else if (dataEvent.includes("watermark")) {
+            videos.videoWatermark = downloadUrl;
+        } else if (dataEvent.includes("mp3")) {
+            videos.music = downloadUrl;   // ✅ perbaikan di sini
+        } else if (dataEvent.includes("mp4")) {
+            videos.videoSD = downloadUrl;
+        }
+    });
 
   return videos
 }
@@ -128,6 +126,11 @@ const createVideoResponse = (
       avatar: $("div.img-area > img").attr("src") || "",
       nickname: $("h2.video-author > b").text()
     },
+    cover: (() => {
+            const bgStyle = $("div.video-header").attr("style") || "";
+            const m = bgStyle.match(/background-image:\s*url\(([^)]+)\)/i);
+            return m ? m[1] : "";
+        })(),
     desc: $("p.video-desc").text(),
     ...videos
   }
