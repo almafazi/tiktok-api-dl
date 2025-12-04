@@ -12,6 +12,7 @@ import { TiktokUserFavoriteVideosResponse } from "./types/get/getUserLiked";
 import { TiktokCollectionResponse } from "./types/get/getCollection";
 import { TiktokTrendingResponse, TrendingCreator } from "./types/get/getTrendings";
 import { TiktokMusicVideosResponse } from "./types/get/getMusicVideos";
+import { TiktokMusicDetailResponse } from "./types/get/getMusicDetail";
 import { TiktokPlaylistResponse } from "./types/get/getPlaylist";
 type DownloaderVersion = "v1" | "v2" | "v3";
 type SearchType = "user" | "live" | "video";
@@ -72,11 +73,15 @@ declare const _default: {
     Trending: (options?: {
         proxy?: string;
     }) => Promise<TiktokTrendingResponse>;
-    GetVideosByMusicId: (musicId: string, options?: {
+    GetVideosByMusicId: (musicIdOrUrl: string, options?: {
         proxy?: string;
         page?: number;
         count?: number;
     }) => Promise<TiktokMusicVideosResponse>;
+    GetMusicDetail: (musicIdOrUrl: string, options: {
+        cookie: string | any[];
+        proxy?: string;
+    }) => Promise<TiktokMusicDetailResponse>;
     TrendingCreators: (options?: {
         proxy?: string;
     }) => Promise<{

@@ -5,4 +5,3 @@ export declare const Collection: (collectionIdOrUrl: string, options?: {
     proxy?: string;
     count?: number;
 }) => Promise<TiktokCollectionResponse>;
-export declare const extractCollectionId: (input: string) => string | null;

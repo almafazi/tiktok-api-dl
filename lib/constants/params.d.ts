@@ -15,4 +15,5 @@ declare const generateOdinId: () => string;
 export declare const _getCollectionParams: (collectionId: string, page?: number, count?: number) => string;
 export declare const _getPlaylistParams: (playlistId: string, page?: number, count?: number) => string;
 export declare const _getMusicVideosParams: (musicId: string, cursor?: number, count?: number) => string;
+export declare const _getMusicDetailParams: (musicId: string) => string;
 export { randomChar, generateSearchId, generateDeviceId, generateOdinId };

@@ -1,4 +1,5 @@
-export declare const _tiktokurl: string;
+export declare const _tiktokDesktopUrl: string;
+export declare const _tiktokMobileUrl: string;
 export declare const _tiktokSearchUserFull: (params: any) => string;
 export declare const _tiktokSearchVideoFull: (params: any) => string;
 export declare const _tiktokSearchLiveFull: (params: any) => string;
@@ -10,6 +11,7 @@ export declare const _tiktokGetCollection: (params: any) => string;
 export declare const _tiktokGetPlaylist: (params: any) => string;
 export declare const _tiktokGetHashtag: (params: any) => string;
 export declare const _tiktokGetMusic: (params: any) => string;
+export declare const _tiktokGetMusicDetail: () => string;
 export declare const _tiktokTrendings: (params: any) => string;
 export declare const _tiktokvApi: string;
 export declare const _tiktokvFeed: (params: any) => string;

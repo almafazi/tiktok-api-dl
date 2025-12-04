@@ -5,4 +5,3 @@ export declare const Playlist: (url: string, options?: {
     proxy?: string;
     count?: number;
 }) => Promise<TiktokPlaylistResponse>;
-export declare const extractPlaylistId: (input: string) => string | null;
