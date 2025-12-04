@@ -2,7 +2,7 @@ import Axios from "axios"
 import asyncRetry from "async-retry"
 import {
   _tiktokvFeed,
-  _tiktokurl,
+  _tiktokDesktopUrl,
   _tiktokGetCollection,
   _tiktokGetPlaylist
 } from "../../constants/api"
@@ -76,7 +76,7 @@ const parseAuthor = (content: any): AuthorTiktokAPI => ({
   region: content.author.region,
   avatarThumb: content.author?.avatar_thumb?.url_list || [],
   avatarMedium: content.author?.avatar_medium?.url_list || [],
-  url: `${_tiktokurl}/@${content.author.unique_id}`
+  url: `${_tiktokDesktopUrl}/@${content.author.unique_id}`
 })
 
 const parseMusic = (content: any): MusicTiktokAPI => ({
@@ -251,12 +251,25 @@ export const TiktokAPI = async (
     url = url.replace("https://vm", "https://vt")
 
     // Get video ID
-    const { request } = await Axios(url, {
-      method: "HEAD",
-      ...createProxyAgent(proxy)
+    const request = await Axios(url, {
+      method: "GET",            
+      maxRedirects: 0,          
+      headers: {
+        "User-Agent": USER_AGENT,
+        "Accept":
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      ...createProxyAgent(proxy),
+      validateStatus: (status) => status >= 200 && status < 400,
     })
 
-    const videoId = extractVideoId(request.res.responseUrl)
+    const redirectUrl =
+      request.headers.location ??
+      request.request?.res?.responseUrl ??
+      url
+
+    const videoId = extractVideoId(redirectUrl)
     if (!videoId) {
       return {
         status: "error",

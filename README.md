@@ -56,6 +56,7 @@
   - [Tiktok Playlist](#tiktok-playlist)
   - [Tiktok Trending](#tiktok-trending)
   - [Tiktok Get Videos by Music ID](#tiktok-get-videos-by-music-id)
+  - [Tiktok Get Music Detail](#tiktok-get-music-detail)
 - [API Response Types](#api-response-types)
   - [Tiktok Downloader](#tiktok-downloader-1)
     - [Version 1 Response](#version-1-response)
@@ -71,6 +72,7 @@
   - [Tiktok Playlist](#tiktok-playlist-1)
   - [Tiktok Trending](#tiktok-trending-1)
   - [Tiktok Get Videos by Music ID](#tiktok-get-videos-by-music-id-1)
+  - [Tiktok Get Music Detail](#tiktok-get-music-detail-response)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -86,6 +88,7 @@ Note : `This project uses the API from Tiktok & Unofficial Tiktok API from Anoth
 - This project is made to help users to get videos, images / slides from a Tiktok collection or playlist.
 - This project is also made to help users to get trending content and creators from Tiktok.
 - This project is also made to help users to get videos that use a specific music/audio track by music ID from Tiktok.
+- This project is also made to help users to get detailed information about a music/audio track from Tiktok.
 
 # Quick Installation
 
@@ -556,16 +559,24 @@ tiktokdl trending-creators -proxy "http://your-proxy-url"
 
 ## Tiktok Get Videos by Music ID
 
-Get videos that use a specific music/audio track by providing the music ID
+Get videos that use a specific music/audio track by providing the music ID or URL
 
 ```javascript
 const Tiktok = require("@tobyg74/tiktok-api-dl")
 
+// Using music ID
 const musicId = "7034143722082192134"
 Tiktok.GetVideosByMusicId(musicId, {
   page: 1, // optional, default is 1
   count: 30, // optional, default is 30
   proxy: "YOUR_PROXY" // optional
+}).then((result) => console.log(result))
+
+// Or using music URL
+const musicUrl = "https://www.tiktok.com/music/QKThr-6771810675950880769"
+Tiktok.GetVideosByMusicId(musicUrl, {
+  page: 1,
+  count: 30
 }).then((result) => console.log(result))
 ```
 
@@ -575,20 +586,102 @@ Tiktok.GetVideosByMusicId(musicId, {
 # Get videos by music ID
 tiktokdl getmusicvideos 7034143722082192134
 
+# Get videos by music URL
+tiktokdl getmusicvideos "https://www.tiktok.com/music/QKThr-6771810675950880769"
+
 # Get videos by music ID with page and count
 tiktokdl getmusicvideos 7034143722082192134 -p 1 -c 20
 
 # Get videos by music ID with proxy
-tiktokdl getmusicvideos 7034143722082192134 -p 1 -c 20 -proxy "http://your-proxy-url"
+tiktokdl getmusicvideos 7034143722082192134 -p 1 -c 20 --proxy "http://your-proxy-url"
+
+# Get raw JSON response
+tiktokdl getmusicvideos 7034143722082192134 -r
 ```
 
 - [Tiktok Music Videos Response](#tiktok-music-videos-response)
+
+## Tiktok Get Music Detail
+
+Get detailed information about a music/audio track by providing the music ID or URL. This feature uses xttparams encryption for enhanced security.
+
+```javascript
+const Tiktok = require("@tobyg74/tiktok-api-dl")
+
+// Using music ID
+const musicId = "7562597337407785760"
+Tiktok.GetMusicDetail(musicId, {
+  cookie: "YOUR_COOKIE", // required
+  proxy: "YOUR_PROXY" // optional
+}).then((result) => console.log(result))
+
+// Or using music URL
+const musicUrl = "https://www.tiktok.com/music/QKThr-6771810675950880769"
+Tiktok.GetMusicDetail(musicUrl, {
+  cookie: "YOUR_COOKIE"
+}).then((result) => console.log(result))
+```
+
+### CLI Usage
+
+**Note:** This command requires a cookie. Set your cookie first using `tiktokdl cookie set <value>`
+
+```bash
+# Set cookie first (required)
+tiktokdl cookie set "YOUR_COOKIE_VALUE"
+
+# Get music detail by ID
+tiktokdl getmusicdetail 7562597337407785760
+
+# Get music detail by URL
+tiktokdl getmusicdetail "https://www.tiktok.com/music/QKThr-6771810675950880769"
+
+# Get music detail with proxy
+tiktokdl getmusicdetail 7562597337407785760 --proxy "http://your-proxy-url"
+
+# Get raw JSON response
+tiktokdl getmusicdetail 7562597337407785760 -r
+```
+
+Download music/audio files from TikTok. Requires cookie authentication.
+
+### CLI Usage for Downloading Music
+
+```bash
+# Set cookie first (required for downloading)
+tiktokdl cookie set "YOUR_TIKTOK_COOKIE"
+
+# Download by music ID
+tiktokdl downloadmusic 7562597337407785760
+
+# Download by music URL
+tiktokdl downloadmusic "https://www.tiktok.com/music/QKThr-6771810675950880769"
+
+# Custom output directory
+tiktokdl downloadmusic 7562597337407785760 -o "./my-music"
+
+# With proxy
+tiktokdl downloadmusic 7562597337407785760 --proxy "http://your-proxy-url"
+```
+
+**How to get TikTok cookie:**
+
+1. Open TikTok in your browser and login
+2. Open DevTools (F12)
+3. Go to Application/Storage > Cookies
+4. Copy the entire cookie value
+5. Set it using: `tiktokdl cookie set "YOUR_COOKIE"`
+
+- [Tiktok Music Detail Response](#tiktok-music-detail-response)
 
 # API Response Types
 
 ## Tiktok Downloader
 
 ### Version 1 Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokAPIResponse {
@@ -657,7 +750,12 @@ interface TiktokAPIResponse {
 }
 ```
 
+</details>
+
 ### Version 2 Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface SSSTikResponse {
@@ -687,7 +785,12 @@ interface SSSTikResponse {
 }
 ```
 
+</details>
+
 ### Version 3 Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface MusicalDownResponse {
@@ -708,9 +811,14 @@ interface MusicalDownResponse {
 }
 ```
 
+</details>
+
 ## Tiktok Search
 
 ### User Search Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokUserSearchResponse {
@@ -732,7 +840,15 @@ interface TiktokUserSearchResponse {
 }
 ```
 
+</details>
+
 ### Live Search Response
+
+<details>
+<<<<<<< HEAD
+<summary>Click to expand</summary>
+=======
+>>>>>>> 0faec9d6c3879db096e5b668c35e0e323900e47b
 
 ```typescript
 interface TiktokLiveSearchResponse {
@@ -773,7 +889,12 @@ interface TiktokLiveSearchResponse {
 }
 ```
 
+</details>
+
 ### Video Search Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokVideoSearchResponse {
@@ -835,9 +956,14 @@ interface TiktokVideoSearchResponse {
 }
 ```
 
+</details>
+
 ## Tiktok Stalk User Profile
 
 ### Profile Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokStalkUserResponse {
@@ -863,9 +989,14 @@ interface TiktokStalkUserResponse {
 }
 ```
 
+</details>
+
 ## Tiktok Video Comments
 
 ### Comments Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokVideoCommentsResponse {
@@ -888,9 +1019,14 @@ interface TiktokVideoCommentsResponse {
 }
 ```
 
+</details>
+
 ## Tiktok User Posts
 
 ### User Posts Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokUserPostsResponse {
@@ -958,9 +1094,14 @@ interface TiktokUserPostsResponse {
 }
 ```
 
+</details>
+
 ## Tiktok User Reposts
 
 ### User Reposts Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokUserRepostsResponse {
@@ -1061,9 +1202,14 @@ interface TiktokUserRepostsResponse {
 }
 ```
 
+</details>
+
 ## Tiktok User Favorite Videos
 
 ### User Favorite Videos Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokUserFavoriteVideosResponse {
@@ -1143,9 +1289,14 @@ interface TiktokUserFavoriteVideosResponse {
 }
 ```
 
+</details>
+
 ## Tiktok Collection
 
 ### Collection Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokCollectionResponse {
@@ -1199,9 +1350,14 @@ interface TiktokCollectionResponse {
 }
 ```
 
+</details>
+
 ## Tiktok Playlist
 
 ### Playlist Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 status: "success" | "error"
@@ -1254,9 +1410,17 @@ result?: {
 }
 ```
 
+</details>
+
 ## Tiktok Trending
 
 ### Trending Response
+
+<details>
+<<<<<<< HEAD
+<summary>Click to expand</summary>
+=======
+>>>>>>> 0faec9d6c3879db096e5b668c35e0e323900e47b
 
 ```typescript
 interface TiktokTrendingResponse {
@@ -1301,7 +1465,12 @@ interface TiktokTrendingResponse {
 }
 ```
 
+</details>
+
 ### Trending Creators Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TrendingCreatorsResponse {
@@ -1326,9 +1495,14 @@ interface TrendingCreatorsResponse {
 }
 ```
 
-## Tiktok Music Videos Response
+</details>
 
-### Music Videos Response
+## Tiktok Get Videos by Music ID
+
+### Get Music Videos Response
+
+<details>
+<summary>Click to expand</summary>
 
 ```typescript
 interface TiktokMusicVideosResponse {
@@ -1414,6 +1588,66 @@ interface TiktokMusicVideosResponse {
   }
 }
 ```
+
+</details>
+
+## Tiktok Get Music Detail Response
+
+### Get Music Detail Response
+
+<details>
+<summary>Click to expand</summary>
+
+```typescript
+interface TiktokMusicDetailResponse {
+  status: "success" | "error"
+  message?: string
+  result?: {
+    musicInfo: {
+      author: {
+        id: string
+        nickname: string
+        uniqueId: string
+        signature: string
+        avatarThumb: string
+        avatarMedium: string
+        avatarLarger: string
+        secUid: string
+        privateAccount: boolean
+        ftc: boolean
+        relation: number
+        openFavorite: boolean
+        secret: boolean
+      }
+      music: {
+        id: string
+        title: string
+        authorName: string
+        original: boolean
+        playUrl: string
+        coverLarge: string
+        coverMedium: string
+        coverThumb: string
+        duration: number
+        private: boolean
+        isCopyrighted: boolean
+      }
+      stats: {
+        videoCount: number
+      }
+    }
+    shareMeta: {
+      title: string
+      desc: string
+    }
+    statusCode: number
+    status_msg: string
+  }
+}
+```
+
+</details>
+<br>
 
 # Changelog
 
