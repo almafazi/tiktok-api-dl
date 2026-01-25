@@ -250,18 +250,28 @@ export = {
    * Tiktok Get User Posts
    * @param {string} username - The username you want to get posts from
    * @param {Object} [options] - The options for getting posts
+   * @param {string|string[]} [options.cookie] - Optional cookie for authentication (recommended for better results)
    * @param {number} [options.postLimit] - Limit number of posts to fetch
    * @param {string} [options.proxy] - Optional proxy URL
    * @returns {Promise<TiktokUserPostsResponse>}
+   *
+   * Note: TikTok's API has strong anti-bot protection. For best results,
+   * provide a cookie string from your browser session (copy from DevTools Network tab).
    */
   GetUserPosts: async (
     username: string,
     options?: {
+      cookie?: string | string[]
       postLimit?: number
       proxy?: string
     }
   ): Promise<TiktokUserPostsResponse> => {
-    return await getUserPosts(username, options?.proxy, options?.postLimit)
+    return await getUserPosts(
+      username,
+      options?.cookie,
+      options?.proxy,
+      options?.postLimit
+    )
   },
 
   /**
