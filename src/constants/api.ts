@@ -29,7 +29,7 @@ export const _tiktokTrendings = (params: any): string =>
   `${_tiktokDesktopUrl}/node/share/discover?${params}`
 
 /** Tiktokv */
-export const _tiktokvApi: string = `https://api16-normal-useast5.tiktokv.us`
+export const _tiktokvApi: string = `https://api16-normal-c-useast1a.tiktokv.com`
 export const _tiktokvFeed = (params: any): string =>
   `${_tiktokvApi}/aweme/v1/feed/?${params}`
 
