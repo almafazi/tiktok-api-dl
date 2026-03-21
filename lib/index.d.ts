@@ -47,6 +47,7 @@ declare const _default: {
         proxy?: string;
     }) => Promise<TiktokVideoCommentsResponse>;
     GetUserPosts: (username: string, options?: {
+        cookie?: string | string[];
         postLimit?: number;
         proxy?: string;
     }) => Promise<TiktokUserPostsResponse>;
