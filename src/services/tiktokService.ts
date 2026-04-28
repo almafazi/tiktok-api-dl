@@ -8,13 +8,6 @@ import { createCipheriv } from "crypto"
 import path from "path"
 
 export class TiktokService {
-  /**
-   * Generate Signature parameter for TikTok API requests
-   * @param {string} id - User ID to generate X-Bogus for
-   * @param {string} secUid - User's secure ID
-   * @param {number} count - Number of items to request
-   * @returns {string} URL with X-Bogus parameter appended
-   */
   public generateSignature(url: URL): string {
     const stringUrl = url.toString()
     const jsdomOptions = this.getJsdomOptions()
@@ -31,13 +24,6 @@ export class TiktokService {
     return signature
   }
 
-  /**
-   * Generate X-Bogus parameter for TikTok API requests
-   * @param {string} id - User ID to generate X-Bogus for
-   * @param {string} secUid - User's secure ID
-   * @param {number} count - Number of items to request
-   * @returns {string} URL with X-Bogus parameter appended
-   */
   public generateXBogus(url: URL, signature?: string): string {
     const jsdomOptions = this.getJsdomOptions()
 
@@ -56,11 +42,6 @@ export class TiktokService {
     return xbogus
   }
 
-  /**
-   * Generate XTTPParams
-   * @param {any} params - The params you want to encrypt
-   * @returns {string}
-   */
   public generateXTTParams(params: any): string {
     const cipher = createCipheriv(
       "aes-128-cbc",
@@ -72,13 +53,7 @@ export class TiktokService {
     )
   }
 
-  /**
-   * Generate URL with X-Bogus
-   * Special thanks to https://github.com/iamatef/xbogus
-   * @param {string} username - The username you want to search
-   * @param {number} page - The page you want to search
-   * @returns {string}
-   */
+  /** Generate search URL with X-Bogus param. Credit: https://github.com/iamatef/xbogus */
   public generateURLXbogus(username: string, page: number): string {
     const baseUrl = `${TiktokService.BASE_URL}api/search/user/full/?`
     const queryParams = _userSearchParams(username, page)
@@ -87,10 +62,6 @@ export class TiktokService {
     return `${baseUrl}${_userSearchParams(username, page, xbogusParams)}`
   }
 
-  /**
-   * Get JSDOM Options
-   * @returns {object}
-   */
   private getJsdomOptions() {
     return {
       url: TiktokService.BASE_URL,
