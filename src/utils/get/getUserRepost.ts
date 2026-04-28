@@ -1,4 +1,4 @@
-import Axios from "axios"
+import { fetch } from "undici"
 import { _tiktokGetReposts } from "../../constants/api"
 import {
   AuthorRepost,
@@ -6,59 +6,37 @@ import {
   TiktokUserRepostsResponse
 } from "../../types/get/getUserReposts"
 import { _getUserRepostsParams } from "../../constants/params"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
 import { StalkUser } from "../get/getProfile"
 import retry from "async-retry"
+import { createDispatcher } from "../proxy"
 
-export const getUserReposts = (
+export const getUserReposts = async (
   username: string,
   proxy?: string,
   postLimit?: number,
   filterDeletedPost: boolean = true
-): Promise<TiktokUserRepostsResponse> =>
-  new Promise((resolve) => {
-    try {
-      StalkUser(username).then(async (res) => {
-        if (res.status === "error") {
-          return resolve({
-            status: "error",
-            message: res.message
-          })
-        }
-
-        const secUid = res.result.user.secUid
-        const data = await parseUserReposts(
-          secUid,
-          postLimit,
-          proxy,
-          filterDeletedPost
-        )
-
-        if (!data.length)
-          return resolve({
-            status: "error",
-            message: "User not found!"
-          })
-
-        resolve({
-          status: "success",
-          result: data,
-          totalReposts: data.length
-        })
-      })
-    } catch (err) {
-      if (
-        err.status == 400 ||
-        (err.response.data && err.response.data.statusCode == 10201)
-      ) {
-        return resolve({
-          status: "error",
-          message: "Video not found!"
-        })
-      }
+): Promise<TiktokUserRepostsResponse> => {
+  try {
+    const profileRes = await StalkUser(username)
+    if (profileRes.status === "error") {
+      return { status: "error", message: profileRes.message }
     }
-  })
+
+    const secUid = profileRes.result.user.secUid
+    const data = await parseUserReposts(secUid, postLimit, proxy, filterDeletedPost)
+
+    if (!data.length) {
+      return { status: "error", message: "No reposts found!" }
+    }
+
+    return { status: "success", result: data, totalReposts: data.length }
+  } catch (err: any) {
+    if (err.status == 400 || err.response?.data?.statusCode == 10201) {
+      return { status: "error", message: "User not found!" }
+    }
+    return { status: "error", message: err.message || "Failed to fetch reposts" }
+  }
+}
 
 const parseUserReposts = async (
   secUid: string,
@@ -247,34 +225,25 @@ const requestUserReposts = async (
       try {
         let urlParams = _getUserRepostsParams(secUid, cursor, count)
 
-        const { data } = await Axios.get(`${_tiktokGetReposts(urlParams)}`, {
+        const res = await fetch(`${_tiktokGetReposts(urlParams)}`, {
           headers: {
             "user-agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"
           },
-          httpsAgent:
-            (proxy &&
-              (proxy.startsWith("http") || proxy.startsWith("https")
-                ? new HttpsProxyAgent(proxy)
-                : proxy.startsWith("socks")
-                ? new SocksProxyAgent(proxy)
-                : undefined)) ||
-            undefined
+          ...createDispatcher(proxy)
         })
 
-        if (data === "") {
-          throw new Error("Empty response")
-        }
-
-        return data
-      } catch (error) {
-        if (
-          error.response?.status === 400 ||
-          error.response?.data?.statusCode === 10201
-        ) {
+        if (res.status === 400) {
           bail(new Error("Video not found!"))
           return
         }
+
+        if (!res.ok) throw new Error(`HTTP error: ${res.status}`)
+        const data = await res.json() as any
+        if (!data) throw new Error("Empty response")
+
+        return data
+      } catch (error) {
         throw error
       }
     },
@@ -282,10 +251,7 @@ const requestUserReposts = async (
       retries: 10,
       minTimeout: 1000,
       maxTimeout: 5000,
-      factor: 2,
-      onRetry: (error, attempt) => {
-        console.log(`Retry attempt ${attempt} due to: ${error}`)
-      }
+      factor: 2
     }
   )
 }
