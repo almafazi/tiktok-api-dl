@@ -1,6 +1,8 @@
 import * as path from "path"
 import * as os from "os"
-import axios from "axios"
+import { fetch } from "undici"
+import { Readable } from "stream"
+import { pipeline } from "stream/promises"
 import * as fs from "fs"
 import { Logger } from "../lib/logger"
 
@@ -61,24 +63,21 @@ async function downloadMedia(
       headers.Referer = "https://www.tiktok.com/"
     }
 
-    const response = await axios({
+    const response = await fetch(url, {
       method: "GET",
-      url: url,
-      responseType: "stream",
       headers: headers
     })
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Failed to download: ${response.status}`)
+    }
 
     if (!fs.existsSync(outputPath)) {
       fs.mkdirSync(outputPath, { recursive: true })
     }
 
-    const writer = fs.createWriteStream(path.join(outputPath, filename))
-    response.data.pipe(writer)
-
-    return new Promise((resolve, reject) => {
-      writer.on("finish", resolve)
-      writer.on("error", reject)
-    })
+    const fileStream = fs.createWriteStream(path.join(outputPath, filename))
+    await pipeline(Readable.fromWeb(response.body as any), fileStream)
   } catch (error) {
     throw new Error(`Failed to download media: ${error.message}`)
   }
