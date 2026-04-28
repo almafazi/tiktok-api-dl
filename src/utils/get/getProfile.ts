@@ -1,87 +1,82 @@
-import Axios from "axios"
 import { load } from "cheerio"
-import {
-  _tiktokGetUserLiked,
-  _tiktokGetPosts,
-  _tiktokDesktopUrl
-} from "../../constants/api"
+import { _tiktokDesktopUrl } from "../../constants/api"
 import {
   TiktokStalkUserResponse,
   StatsUserProfile,
   UserProfile,
   StatsV2UserProfile
 } from "../../types/get/getProfile"
-import { _getUserPostsParams, _xttParams } from "../../constants/params"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
+import retry from "async-retry"
+import { fetch, ProxyAgent } from "undici"
 
-/**
- * Tiktok Stalk User
- * @param {string} username - The username you want to stalk
- * @param {string} proxy - Your Proxy (optional)
- * @returns {Promise<TiktokStalkUserResponse>}
- */
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-export const StalkUser = (
+export const StalkUser = async (
   username: string,
-  proxy?: string
-): Promise<TiktokStalkUserResponse> =>
-  new Promise(async (resolve) => {
-    username = username.replace("@", "")
-    Axios(`${_tiktokDesktopUrl}/@${username}`, {
-      method: "GET",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Safari/537.36"
+  proxy?: string,
+  cookie?: string
+): Promise<TiktokStalkUserResponse> => {
+  username = username.replace("@", "")
+
+  try {
+    const data = await retry(
+      async (bail) => {
+        const res = await fetch(`${_tiktokDesktopUrl}/@${username}`, {
+          headers: {
+            "User-Agent": USER_AGENT,
+            ...(cookie ? { Cookie: cookie } : {})
+          },
+          ...(proxy ? { dispatcher: new ProxyAgent(proxy) } : {})
+        })
+
+        const html = await res.text()
+
+        const $ = load(html)
+        const scriptText = $("script#__UNIVERSAL_DATA_FOR_REHYDRATION__").text()
+        if (!scriptText) {
+          // WAF block - retryable
+          throw new Error("WAF_BLOCKED")
+        }
+
+        return html
       },
-      httpsAgent:
-        (proxy &&
-          (proxy.startsWith("http") || proxy.startsWith("https")
-            ? new HttpsProxyAgent(proxy)
-            : proxy.startsWith("socks")
-            ? new SocksProxyAgent(proxy)
-            : undefined)) ||
-        undefined
-    })
-      .then(async ({ data }) => {
-        const $ = load(data)
-        const result = JSON.parse(
-          $("script#__UNIVERSAL_DATA_FOR_REHYDRATION__").text()
-        )
-        if (
-          !result["__DEFAULT_SCOPE__"] &&
-          !result["__DEFAULT_SCOPE__"]["webapp.user-detail"]
-        ) {
-          return resolve({
-            status: "error",
-            message: "User not found!"
-          })
+      {
+        retries: 20,
+        minTimeout: 500,
+        maxTimeout: 2000,
+        randomize: true,
+        onRetry: (err) => {
+          if ((err as Error).message !== "WAF_BLOCKED") throw err
         }
-        const dataUser =
-          result["__DEFAULT_SCOPE__"]["webapp.user-detail"]["userInfo"]
+      }
+    )
 
-        if (!dataUser) {
-          return resolve({
-            status: "error",
-            message: "User not found!"
-          })
-        }
+    const $ = load(data)
+    const scriptText = $("script#__UNIVERSAL_DATA_FOR_REHYDRATION__").text()
+    const result = JSON.parse(scriptText)
+    const userDetail = result?.["__DEFAULT_SCOPE__"]?.["webapp.user-detail"]
+    const dataUser = userDetail?.userInfo
 
-        const { user, stats, statsV2 } = parseDataUser(dataUser)
+    if (!dataUser) {
+      return { status: "error", message: "User not found!" }
+    }
 
-        let response: TiktokStalkUserResponse = {
-          status: "success",
-          result: {
-            user,
-            stats,
-            statsV2
-          }
-        }
-
-        resolve(response)
-      })
-      .catch((e) => resolve({ status: "error", message: e.message }))
-  })
+    const { user, stats, statsV2 } = parseDataUser(dataUser)
+    return { status: "success", result: { user, stats, statsV2 } }
+  } catch (error: any) {
+    if (error.message === "WAF_BLOCKED") {
+      return {
+        status: "error",
+        message: "TikTok blocked the request (WAF). Please provide a cookie or try again later."
+      }
+    }
+    return {
+      status: "error",
+      message: error instanceof Error ? error.message : "Failed to fetch user"
+    }
+  }
+}
 
 const parseDataUser = (dataUser: any) => {
   // User Info Result
