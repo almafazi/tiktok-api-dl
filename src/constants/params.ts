@@ -1,4 +1,3 @@
-import { count } from "console"
 import qs from "qs"
 
 /** Get Params */
@@ -544,7 +543,7 @@ export const _getMusicVideosParams = (
     screen_width: 1920,
     tz_name: "America/New_York",
     timezone_name: "America/New_York",
-    verifyFp: "verify_dca8729afe5c502257ed30b0b070dbdb",
+    verifyFp: "verify_moimovok_v5I0aNCj_OKr5_43t2_9WZU_9WOTUVPgJZa3",
     webcast_language: "en"
   })
 }
@@ -554,32 +553,34 @@ export const _getMusicDetailParams = (musicId: string) => {
     aid: 1988,
     app_language: "en",
     app_name: "tiktok_web",
+    battery_info: 1,
     browser_language: "en-US",
     browser_name: "Mozilla",
     browser_online: true,
-    browser_platform: "Linux x86_64",
-    browser_version: "5.0 (X11)",
+    browser_platform: "Win32",
+    browser_version:
+      "5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36 Edg/98.0.1108.50",
     channel: "tiktok_web",
     cookie_enabled: true,
-    data_collection_enabled: true,
-    device_id: "7551034554073482753",
+    cursor: 0,
+    device_id: "7067278850413610501",
     device_platform: "web_pc",
     focus_state: true,
     from_page: "music",
-    history_len: 5,
+    history_len: 50,
     is_fullscreen: false,
     is_page_visible: true,
     language: "en",
     musicId,
-    os: "linux",
-    priority_region: "ID",
-    referer: "https://www.tiktok.com/id-ID/",
-    region: "ID",
-    root_referer: "https://www.google.com/",
-    screen_height: 1080,
+    os: "windows",
+    priority_region: "",
+    referer: "",
+    region: "US",
+    root_referer: "https://www.tiktok.com/",
+    screen_height: 1200,
     screen_width: 1920,
-    tz_name: "Asia/Jakarta",
-    is_encryption: 1
+    tz_name: "America/New_York",
+    webcast_language: "en"
   })
 }
 
