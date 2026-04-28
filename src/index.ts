@@ -75,14 +75,6 @@ type TiktokSearchResponse<T extends SearchType> = {
   totalResults?: number
 }
 
-/** Helper Functions */
-const handleError = (message: string) => {
-  return {
-    status: "error",
-    message
-  }
-}
-
 /** Main API */
 export = {
   /**
@@ -153,7 +145,9 @@ export = {
     }
   ): Promise<TiktokSearchResponse<T>> => {
     try {
-      const type = options?.type?.toLowerCase() as SearchType
+      if (!options) throw new Error(ERROR_MESSAGES.INVALID_SEARCH_TYPE)
+
+      const type = options.type?.toLowerCase() as SearchType
       if (!type || !Object.values(SEARCH_TYPES).includes(type)) {
         throw new Error(ERROR_MESSAGES.INVALID_SEARCH_TYPE)
       }
@@ -163,8 +157,8 @@ export = {
           const userResults = await SearchUser(
             keyword,
             options.cookie,
-            options?.page,
-            options?.proxy
+            options.page,
+            options.proxy
           )
           return {
             ...userResults,
@@ -177,8 +171,8 @@ export = {
           const liveResults = await SearchLive(
             keyword,
             options.cookie,
-            options?.page,
-            options?.proxy
+            options.page,
+            options.proxy
           )
           return {
             ...liveResults,
@@ -191,8 +185,8 @@ export = {
           const videoResults = await SearchVideo(
             keyword,
             options.cookie,
-            options?.page,
-            options?.proxy
+            options.page,
+            options.proxy
           )
           return {
             ...videoResults,
@@ -207,7 +201,7 @@ export = {
     } catch (error) {
       return {
         status: "error",
-        message: error.message
+        message: error instanceof Error ? error.message : "An error occurred"
       }
     }
   },
@@ -223,9 +217,10 @@ export = {
     username: string,
     options?: {
       proxy?: string
+      cookie?: string
     }
   ): Promise<TiktokStalkUserResponse> => {
-    return await StalkUser(username, options?.proxy)
+    return await StalkUser(username, options?.proxy, options?.cookie)
   },
 
   /**
@@ -292,9 +287,7 @@ export = {
     }
   ): Promise<TiktokUserFavoriteVideosResponse> => {
     if (!validateCookie(options?.cookie)) {
-      return handleError(
-        ERROR_MESSAGES.COOKIE_REQUIRED
-      ) as TiktokUserFavoriteVideosResponse
+      return { status: "error", message: ERROR_MESSAGES.COOKIE_REQUIRED } as TiktokUserFavoriteVideosResponse
     }
 
     return await getUserLiked(
