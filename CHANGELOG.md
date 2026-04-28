@@ -47,13 +47,20 @@ History of changes to the project.
 
 ## Version 1.3.8 - 28-04-2026
 
+### Added
+
+- Add undici ProxyAgent utility for proxy support [62e31f5](https://github.com/TobyG74/tiktok-api-dl/commit/62e31f52be3f414901f39605548cbd9586ad95f0)
+
 ### Fixed
 
-- Fix the getProfile error when request
+- Fix the getProfile error when WAF blocked with retry logic [b512abd](https://github.com/TobyG74/tiktok-api-dl/commit/b512abd42394f75b07076d8e76d9a9ff526d82b8)
+- Fix getMusicDetail using desktop API with x-tt-params [6b06bcd](https://github.com/TobyG74/tiktok-api-dl/commit/6b06bcd1d710925ed5dacd9b6c606e6bb8c89ba7)
 
 ### Changed
 
-- Refactoring the code to make it more efficient and cleaner
+- Migrate all HTTP calls from axios to undici fetch [cdcf6a4](https://github.com/TobyG74/tiktok-api-dl/commit/cdcf6a48a4b97af12e364c1ab2a6b0feb37f3df3) [cea12d9](https://github.com/TobyG74/tiktok-api-dl/commit/cea12d9f66340cd949e75b8e7e67614a3410c3bf) [e5f0d5a](https://github.com/TobyG74/tiktok-api-dl/commit/e5f0d5a00b00b5cb8448d9f7b3bfc751da93aa01) [c8e951b](https://github.com/TobyG74/tiktok-api-dl/commit/c8e951b9c1767c99ccf36e07db99432faf21d77f)
+- Replace axios with undici and add async-retry dependency [f91608f](https://github.com/TobyG74/tiktok-api-dl/commit/f91608f5233adb0a2fd09a925e3b182f34ecb4c1)
+- Make cookie optional in GetMusicDetail [b5cc70e](https://github.com/TobyG74/tiktok-api-dl/commit/b5cc70e3b02051ae38f93a7d38377060f7279702)
 
 ## Version 1.3.7 - 27-10-2025
 
