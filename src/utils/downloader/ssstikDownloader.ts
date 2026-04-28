@@ -1,4 +1,4 @@
-import Axios from "axios"
+import { fetch } from "undici"
 import asyncRetry from "async-retry"
 import { load } from "cheerio"
 type CheerioAPI = ReturnType<typeof load>
@@ -9,45 +9,13 @@ import {
   SSSTikResponse
 } from "../../types/downloader/ssstikDownloader"
 import { _ssstikapi, _ssstikurl } from "../../constants/api"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
-import { ERROR_MESSAGES } from "../../constants"
+import { ERROR_MESSAGES, TIKTOK_URL_REGEX } from "../../constants"
+import { createDispatcher } from "../proxy"
 
-/**
- * Using API from Website:
- * BASE URL : https://ssstik.io
- */
-
-/** Constants */
-const TIKTOK_URL_REGEX =
-  /https:\/\/(?:m|t|www|vm|vt|lite)?\.?tiktok\.com\/((?:.*\b(?:(?:usr|v|embed|user|video|photo)\/|\?shareId=|\&item_id=)(\d+))|\w+)/
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/111.0"
 
-/** Types */
-interface ProxyConfig {
-  httpsAgent?: HttpsProxyAgent<string> | SocksProxyAgent
-}
-
-/** Helper Functions */
-const createProxyAgent = (proxy?: string): ProxyConfig => {
-  if (!proxy) return {}
-
-  const isHttpProxy = proxy.startsWith("http") || proxy.startsWith("https")
-  const isSocksProxy = proxy.startsWith("socks")
-
-  if (!isHttpProxy && !isSocksProxy) return {}
-
-  return {
-    httpsAgent: isHttpProxy
-      ? new HttpsProxyAgent(proxy)
-      : new SocksProxyAgent(proxy)
-  }
-}
-
-const validateTikTokUrl = (url: string): boolean => {
-  return TIKTOK_URL_REGEX.test(url)
-}
+const validateTikTokUrl = (url: string): boolean => TIKTOK_URL_REGEX.test(url)
 
 const extractTTValue = (html: string): string | null => {
   const regex = /s_tt\s*=\s*["']([^"']+)["']/
@@ -116,12 +84,13 @@ const createMusicResponse = (
 
 const fetchTT = async (proxy?: string): Promise<SSSTikFetchTT> => {
   try {
-    const { data } = await Axios(_ssstikurl, {
+    const res = await fetch(_ssstikurl, {
       method: "GET",
       headers: { "User-Agent": USER_AGENT },
-      ...createProxyAgent(proxy)
+      ...createDispatcher(proxy)
     })
 
+    const data = await res.text()
     const ttValue = extractTTValue(data)
     if (!ttValue) {
       return {
@@ -171,7 +140,7 @@ export const SSSTik = async (
 
     const response = await asyncRetry(
       async () => {
-        const res = await Axios(_ssstikapi, {
+        const res = await fetch(_ssstikapi, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -179,16 +148,16 @@ export const SSSTik = async (
             Referer: `${_ssstikurl}/en`,
             "User-Agent": USER_AGENT
           },
-          data: new URLSearchParams({
+          body: new URLSearchParams({
             id: url,
             locale: "en",
-            tt: tt.result
+            tt: tt.result!
           }),
-          ...createProxyAgent(proxy)
+          ...createDispatcher(proxy)
         })
 
-        if (res.status === 200 && res.data) {
-          return res.data
+        if (res.status === 200) {
+          return await res.text()
         }
 
         throw new Error(ERROR_MESSAGES.NETWORK_ERROR)

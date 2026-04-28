@@ -1,16 +1,7 @@
-import Axios from "axios"
+import { fetch } from "undici"
 import asyncRetry from "async-retry"
-import {
-  _tiktokvFeed,
-  _tiktokDesktopUrl,
-  _tiktokGetCollection,
-  _tiktokGetPlaylist
-} from "../../constants/api"
-import {
-  _tiktokApiParams,
-  _getCollectionParams,
-  _getPlaylistParams
-} from "../../constants/params"
+import { _tiktokvFeed, _tiktokDesktopUrl } from "../../constants/api"
+import { _tiktokApiParams } from "../../constants/params"
 import {
   AuthorTiktokAPI,
   TiktokAPIResponse,
@@ -19,40 +10,13 @@ import {
   ResponseParserTiktokAPI,
   VideoTiktokAPI
 } from "../../types/downloader/tiktokApiDownloader"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
-import { ERROR_MESSAGES } from "../../constants"
+import { ERROR_MESSAGES, TIKTOK_URL_REGEX } from "../../constants"
+import { createDispatcher } from "../proxy"
 
-/** Constants */
-const TIKTOK_URL_REGEX =
-  /https:\/\/(?:m|t|www|vm|vt|lite)?\.?tiktok\.com\/((?:.*\b(?:(?:usr|v|embed|user|video|photo)\/|\?shareId=|\&item_id=)(\d+))|\w+)/
 const USER_AGENT =
   "com.zhiliaoapp.musically/300904 (2018111632; U; Android 10; en_US; Pixel 4; Build/QQ3A.200805.001; Cronet/58.0.2991.0)"
 
-/** Types */
-interface ProxyConfig {
-  httpsAgent?: HttpsProxyAgent<string> | SocksProxyAgent
-}
-
-/** Helper Functions */
-const createProxyAgent = (proxy?: string): ProxyConfig => {
-  if (!proxy) return {}
-
-  const isHttpProxy = proxy.startsWith("http") || proxy.startsWith("https")
-  const isSocksProxy = proxy.startsWith("socks")
-
-  if (!isHttpProxy && !isSocksProxy) return {}
-
-  return {
-    httpsAgent: isHttpProxy
-      ? new HttpsProxyAgent(proxy)
-      : new SocksProxyAgent(proxy)
-  }
-}
-
-const validateTikTokUrl = (url: string): boolean => {
-  return TIKTOK_URL_REGEX.test(url)
-}
+const validateTikTokUrl = (url: string): boolean => TIKTOK_URL_REGEX.test(url)
 
 const extractVideoId = (responseUrl: string): string | null => {
   const matches = responseUrl.match(/\d{17,21}/g)
@@ -124,17 +88,19 @@ const fetchTiktokData = async (
   try {
     const response = await asyncRetry(
       async () => {
-        const res = await Axios(
+        const res = await fetch(
           _tiktokvFeed(_tiktokApiParams({ aweme_id: ID })),
           {
             method: "OPTIONS",
             headers: { "User-Agent": USER_AGENT },
-            ...createProxyAgent(proxy)
+            ...createDispatcher(proxy)
           }
         )
 
-        if (res.data && res.data.status_code === 0) {
-          return res.data
+        if (!res.ok) throw new Error(ERROR_MESSAGES.NETWORK_ERROR)
+        const resData = await res.json() as any
+        if (resData && resData.status_code === 0) {
+          return resData
         }
 
         throw new Error(ERROR_MESSAGES.NETWORK_ERROR)
@@ -209,20 +175,13 @@ export const handleRedirect = async (
   proxy?: string
 ): Promise<string> => {
   try {
-    const response = await Axios(url, {
+    const response = await fetch(url, {
       method: "HEAD",
-      maxRedirects: 5,
-      validateStatus: (status) => status >= 200 && status < 400,
-      ...createProxyAgent(proxy)
+      redirect: "follow",
+      ...createDispatcher(proxy)
     })
-
-    // Get the final URL after all redirects
-    const finalUrl = response.request.res.responseUrl
-
-    // Remove query parameters
-    return finalUrl.split("?")[0]
-  } catch (error) {
-    console.error("Error handling redirect:", error)
+    return (response.url || url).split("?")[0]
+  } catch {
     return url
   }
 }
@@ -251,23 +210,19 @@ export const TiktokAPI = async (
     url = url.replace("https://vm", "https://vt")
 
     // Get video ID
-    const request = await Axios(url, {
-      method: "GET",            
-      maxRedirects: 0,          
+    const request = await fetch(url, {
+      method: "GET",
       headers: {
         "User-Agent": USER_AGENT,
         "Accept":
           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
       },
-      ...createProxyAgent(proxy),
-      validateStatus: (status) => status >= 200 && status < 400,
+      redirect: "follow",
+      ...createDispatcher(proxy),
     })
 
-    const redirectUrl =
-      request.headers.location ??
-      request.request?.res?.responseUrl ??
-      url
+    const redirectUrl = request.url || url
 
     const videoId = extractVideoId(redirectUrl)
     if (!videoId) {
@@ -287,6 +242,10 @@ export const TiktokAPI = async (
     }
 
     const { content, author, statistics, music } = data
+
+    if (!author || !statistics || !music) {
+      return { status: "error", message: ERROR_MESSAGES.NETWORK_ERROR }
+    }
 
     // Create response based on content type
     const response = content.image_post_info
