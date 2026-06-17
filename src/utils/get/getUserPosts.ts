@@ -1,125 +1,76 @@
-import Axios from "axios"
+import { fetch } from "undici"
 import { _tiktokDesktopUrl } from "../../constants/api"
 import {
   AuthorPost,
   Posts,
   TiktokUserPostsResponse
 } from "../../types/get/getUserPosts"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
 import { StalkUser } from "../get/getProfile"
 import retry from "async-retry"
+import { createDispatcher } from "../proxy"
 // @ts-ignore
 import xbogus from "../../../helper/xbogus"
 
-/**
- * Get user posts from TikTok
- * @param {string} username - The username to fetch posts for
- * @param {string} cookie - Optional browser cookie string for authentication (recommended for better results)
- * @param {string} proxy - Optional proxy URL
- * @param {number} postLimit - Optional limit on number of posts to fetch
- * @returns {Promise<TiktokUserPostsResponse>}
- *
- * Note: TikTok's API has strong anti-bot protection. For best results,
- * provide a cookie string from your browser session (copy from DevTools Network tab).
- */
-export const getUserPosts = (
+export const getUserPosts = async (
   username: string,
   cookie?: string | string[],
   proxy?: string,
   postLimit?: number
-): Promise<TiktokUserPostsResponse> =>
-  new Promise(async (resolve) => {
-    try {
-      // Use provided cookie or try to get cookies from profile page
-      let cookies = ""
-      if (cookie) {
-        cookies = Array.isArray(cookie) ? cookie.join("; ") : cookie
-      } else {
-        cookies = await getCookiesFromProfile(username, proxy)
-      }
-
-      StalkUser(username, proxy).then(async (res) => {
-        if (res.status === "error") {
-          return resolve({
-            status: "error",
-            message: res.message
-          })
-        }
-
-        const secUid = res.result.user.secUid
-        try {
-          const data = await parseUserPosts(secUid, postLimit, proxy, cookies)
-
-          if (!data.length)
-            return resolve({
-              status: "error",
-              message:
-                "Unable to fetch posts. TikTok API returned empty response. " +
-                "This is often due to TikTok's anti-bot protection. " +
-                "Try providing a cookie string from your browser session for better results."
-            })
-
-          resolve({
-            status: "success",
-            result: data,
-            totalPosts: data.length
-          })
-        } catch (err: any) {
-          return resolve({
-            status: "error",
-            message: err.message || "Unable to fetch posts"
-          })
-        }
-      })
-    } catch (err: any) {
-      if (
-        err.status == 400 ||
-        (err.response?.data && err.response.data.statusCode == 10201)
-      ) {
-        return resolve({
-          status: "error",
-          message: "User not found!"
-        })
-      }
-      return resolve({
-        status: "error",
-        message: err.message || "Unknown error"
-      })
-    }
-  })
-
-/**
- * Get cookies from TikTok profile page
- */
-const getCookiesFromProfile = async (
-  username: string,
-  proxy?: string
-): Promise<string> => {
+): Promise<TiktokUserPostsResponse> => {
   try {
-    const response = await Axios.get(
+    let cookies = ""
+    if (cookie) {
+      cookies = Array.isArray(cookie) ? cookie.join("; ") : cookie
+    } else {
+      cookies = await getCookiesFromProfile(username, proxy)
+    }
+
+    const profileRes = await StalkUser(username, proxy, cookies || undefined)
+    if (profileRes.status === "error") {
+      return { status: "error", message: profileRes.message }
+    }
+
+    if (!profileRes.result) {
+      return { status: "error", message: "User not found!" }
+    }
+
+    const secUid = profileRes.result.user.secUid
+    const data = await parseUserPosts(secUid, postLimit, proxy, cookies)
+
+    if (!data.length) {
+      return {
+        status: "error",
+        message:
+          "Unable to fetch posts. TikTok API returned empty response. " +
+          "Try providing a cookie string from your browser session."
+      }
+    }
+
+    return { status: "success", result: data, totalPosts: data.length }
+  } catch (err: any) {
+    if (err.status == 400 || err.response?.data?.statusCode == 10201) {
+      return { status: "error", message: "User not found!" }
+    }
+    return { status: "error", message: err.message || "Failed to fetch posts" }
+  }
+}
+
+const getCookiesFromProfile = async (username: string, proxy?: string): Promise<string> => {
+  try {
+    const response = await fetch(
       `${_tiktokDesktopUrl}/@${username.replace("@", "")}`,
       {
         headers: {
           "User-Agent": userAgent,
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
           "Accept-Language": "en-US,en;q=0.9"
         },
-        httpsAgent:
-          (proxy &&
-            (proxy.startsWith("http") || proxy.startsWith("https")
-              ? new HttpsProxyAgent(proxy)
-              : proxy.startsWith("socks")
-              ? new SocksProxyAgent(proxy)
-              : undefined)) ||
-          undefined
+        ...createDispatcher(proxy)
       }
     )
-
-    const setCookies = response.headers["set-cookie"] || []
+    const setCookies = (response.headers as any).getSetCookie?.() || []
     return setCookies.map((c: string) => c.split(";")[0]).join("; ")
-  } catch (error) {
+  } catch {
     return ""
   }
 }
@@ -247,8 +198,7 @@ const requestUserPosts = async (
 ): Promise<any> => {
   return retry(
     async (bail, attempt) => {
-      try {
-        // Build params matching working browser request
+      // Build params matching working browser request
         const params = new URLSearchParams({
           WebIdLastTime: Math.floor(Date.now() / 1000).toString(),
           aid: "1988",
@@ -293,12 +243,11 @@ const requestUserPosts = async (
         const xBogusValue = xbogus(baseUrl, userAgent)
         const finalUrl = `${baseUrl}&X-Bogus=${xBogusValue}`
 
-        const { data } = await Axios.get(finalUrl, {
+        const res = await fetch(finalUrl, {
           headers: {
             "User-Agent": userAgent,
             Accept: "*/*",
             "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
             Referer: `${_tiktokDesktopUrl}/`,
             "Sec-Ch-Ua":
               '"Not(A:Brand";v="8", "Chromium";v="144", "Microsoft Edge";v="144"',
@@ -309,18 +258,38 @@ const requestUserPosts = async (
             "Sec-Fetch-Site": "same-origin",
             ...(cookies ? { Cookie: cookies } : {})
           },
-          httpsAgent:
-            (proxy &&
-              (proxy.startsWith("http") || proxy.startsWith("https")
-                ? new HttpsProxyAgent(proxy)
-                : proxy.startsWith("socks")
-                ? new SocksProxyAgent(proxy)
-                : undefined)) ||
-            undefined
+          ...createDispatcher(proxy)
         })
 
-        if (data === "" || !data) {
-          // Bail after 3 consecutive empty responses - API is likely blocked
+        if (res.status === 400) {
+          bail(new Error("Video not found!"))
+          return
+        }
+        if (res.status === 429) {
+          if (attempt >= 3) {
+            bail(new Error("Rate limited by TikTok. Please try again later."))
+            return
+          }
+          throw new Error("Rate limited")
+        }
+
+        const raw = await res.text()
+        if (!raw) {
+          if (attempt >= 3) {
+            bail(
+              new Error(
+                "TikTok API returned empty response. This is often due to TikTok's anti-bot protection. " +
+                  "Try providing a cookie string from your browser session for better results."
+              )
+            )
+            return
+          }
+          throw new Error("Empty response")
+        }
+
+        let data: any
+        try { data = JSON.parse(raw) } catch { data = null }
+        if (!data) {
           if (attempt >= 3) {
             bail(
               new Error(
@@ -334,33 +303,12 @@ const requestUserPosts = async (
         }
 
         return data
-      } catch (error: any) {
-        if (
-          error.response?.status === 400 ||
-          error.response?.data?.statusCode === 10201
-        ) {
-          bail(new Error("Video not found!"))
-          return
-        }
-        if (error.response?.status === 429) {
-          // For rate limiting, wait longer and retry instead of bailing
-          if (attempt >= 3) {
-            bail(new Error("Rate limited by TikTok. Please try again later."))
-            return
-          }
-          throw new Error("Rate limited")
-        }
-        throw error
-      }
     },
     {
       retries: 5,
       minTimeout: 2000,
       maxTimeout: 10000,
-      factor: 2,
-      onRetry: (error, attempt) => {
-        console.log(`Retry attempt ${attempt} due to: ${error}`)
-      }
+      factor: 2
     }
   )
 }

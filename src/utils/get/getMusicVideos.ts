@@ -1,4 +1,4 @@
-import Axios from "axios"
+import { fetch } from "undici"
 import { _tiktokGetMusic } from "../../constants/api"
 import {
   TiktokMusicVideosResponse,
@@ -11,65 +11,36 @@ import {
   EffectSticker
 } from "../../types/get/getMusicVideos"
 import { _getMusicVideosParams } from "../../constants/params"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
 import { TiktokService } from "../../services/tiktokService"
 import retry from "async-retry"
 import { extractMusicId } from "../urlExtractors"
+import { createDispatcher } from "../proxy"
 
-export const getMusicVideos = (
+export const getMusicVideos = async (
   musicIdOrUrl: string,
   proxy?: string,
   page?: number,
   count?: number
-): Promise<TiktokMusicVideosResponse> =>
-  new Promise(async (resolve) => {
-    try {
-      // Extract music ID from URL or use as is
-      const musicId = extractMusicId(musicIdOrUrl)
-
-      if (!musicId) {
-        return resolve({
-          status: "error",
-          message: "Invalid music ID or URL format"
-        })
-      }
-
-      const data = await parseMusicVideos(
-        musicId,
-        page || 1,
-        count || 30,
-        proxy
-      )
-
-      if (!data.videos || data.videos.length === 0) {
-        return resolve({
-          status: "error",
-          message: "No videos found for this music ID!"
-        })
-      }
-
-      resolve({
-        status: "success",
-        result: data
-      })
-    } catch (err: any) {
-      if (
-        err.status === 400 ||
-        (err.response?.data && err.response.data.statusCode === 10201)
-      ) {
-        return resolve({
-          status: "error",
-          message: "Music not found!"
-        })
-      }
-
-      return resolve({
-        status: "error",
-        message: err.message || "Failed to fetch music videos"
-      })
+): Promise<TiktokMusicVideosResponse> => {
+  try {
+    const musicId = extractMusicId(musicIdOrUrl)
+    if (!musicId) {
+      return { status: "error", message: "Invalid music ID or URL format" }
     }
-  })
+
+    const data = await parseMusicVideos(musicId, page || 1, count || 30, proxy)
+    if (!data.videos?.length) {
+      return { status: "error", message: "No videos found for this music!" }
+    }
+
+    return { status: "success", result: data }
+  } catch (err: any) {
+    if (err.response?.status === 400 || err.response?.data?.statusCode === 10201) {
+      return { status: "error", message: "Music not found!" }
+    }
+    return { status: "error", message: err.message || "Failed to fetch music videos" }
+  }
+}
 
 const parseMusicVideos = async (
   musicId: string,
@@ -268,10 +239,9 @@ const requestMusicVideos = async (
 ): Promise<any> => {
   return retry(
     async (bail, attempt) => {
-      try {
-        const params = _getMusicVideosParams("", 0, 30) // Will be overridden by xttParams
+      const params = _getMusicVideosParams("", 0, 30) // Will be overridden by xttParams
 
-        const { data } = await Axios.get(`${_tiktokGetMusic(params)}`, {
+        const res = await fetch(`${_tiktokGetMusic(params)}`, {
           headers: {
             "user-agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.53",
@@ -285,41 +255,25 @@ const requestMusicVideos = async (
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin"
           },
-          httpsAgent:
-            (proxy &&
-              (proxy.startsWith("http") || proxy.startsWith("https")
-                ? new HttpsProxyAgent(proxy)
-                : proxy.startsWith("socks")
-                ? new SocksProxyAgent(proxy)
-                : undefined)) ||
-            undefined
+          ...createDispatcher(proxy)
         })
 
-        if (data === "" || !data) {
-          throw new Error("Empty response")
-        }
-
-        return data
-      } catch (error: any) {
-        if (
-          error.response?.status === 400 ||
-          error.response?.status === 404 ||
-          error.response?.data?.statusCode === 10201
-        ) {
+        if (res.status === 400 || res.status === 404) {
           bail(new Error("Music not found or access forbidden!"))
           return
         }
-        throw error
-      }
+
+        if (!res.ok) throw new Error("Empty response")
+        const data = await res.json() as any
+        if (!data) throw new Error("Empty response")
+
+        return data
     },
     {
       retries: 10,
       minTimeout: 1000,
       maxTimeout: 5000,
-      factor: 2,
-      onRetry: (error, attempt) => {
-        console.log(`Retry attempt ${attempt} due to: ${error}`)
-      }
+      factor: 2
     }
   )
 }

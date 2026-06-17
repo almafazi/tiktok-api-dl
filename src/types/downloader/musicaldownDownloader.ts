@@ -1,6 +1,6 @@
 import { BaseResponse } from "../common"
 
-export type GetMusicalDownReuqest = BaseResponse & {
+export type GetMusicalDownRequest = BaseResponse & {
   request?: {
     [key: string]: string
   }

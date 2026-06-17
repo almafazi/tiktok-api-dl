@@ -372,12 +372,14 @@ program
   .description("Get posts from a TikTok user")
   .argument("<username>", "TikTok username")
   .option("-l, --limit <number>", "Limit of posts", "5")
+  .option("-c, --cookie <cookie>", "TikTok cookie (required to bypass WAF)")
   .option("--proxy <proxy>", "Proxy URL (http/https/socks)")
   .action(async (username, options) => {
     try {
       const postLimit = parseInt(options.limit)
       const results = await Tiktok.GetUserPosts(username, {
         postLimit: postLimit,
+        cookie: options.cookie,
         proxy: options.proxy
       })
       if (results.status === "success") {

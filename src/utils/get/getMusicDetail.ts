@@ -1,80 +1,61 @@
-import Axios from "axios"
+import { fetch } from "undici"
 import { _tiktokGetMusicDetail } from "../../constants/api"
 import { TiktokMusicDetailResponse } from "../../types/get/getMusicDetail"
 import { _getMusicDetailParams } from "../../constants/params"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
 import { TiktokService } from "../../services/tiktokService"
 import { webUserAgent } from "../../constants/headers"
 import { extractMusicId } from "../urlExtractors"
+import { createDispatcher } from "../proxy"
+import fs from "fs"
 
-export const getMusicDetail = (
+export const getMusicDetail = async (
   musicIdOrUrl: string,
   cookie: string | any[],
   proxy?: string
-): Promise<TiktokMusicDetailResponse> =>
-  new Promise(async (resolve) => {
-    try {
-      // Extract music ID from URL or use as is
-      const musicId = extractMusicId(musicIdOrUrl)
-
-      if (!musicId) {
-        return resolve({
-          status: "error",
-          message: "Invalid music ID or URL format"
-        })
-      }
-
-      const Tiktok = new TiktokService()
-
-      // Generate xttparams
-      const params = _getMusicDetailParams(musicId)
-      const xttparams = Tiktok.generateXTTParams(params)
-
-      // Build URL
-      const url = new URL(_tiktokGetMusicDetail())
-      url.search = params
-
-      // Setup axios config
-      const config: any = {
-        headers: {
-          "User-Agent": webUserAgent,
-          Cookie: Array.isArray(cookie) ? cookie.join("; ") : cookie,
-          "x-tt-params": xttparams
-        }
-      }
-
-      // Setup proxy if provided
-      if (proxy) {
-        if (proxy.startsWith("http://") || proxy.startsWith("https://")) {
-          config.httpsAgent = new HttpsProxyAgent(proxy)
-        } else if (proxy.startsWith("socks://")) {
-          config.httpsAgent = new SocksProxyAgent(proxy)
-        }
-      }
-
-      // Make request
-      const response = await Axios.get(url.toString(), config)
-
-      if (response.data.statusCode === 0 && response.data.musicInfo) {
-        resolve({
-          status: "success",
-          result: {
-            musicInfo: response.data.musicInfo,
-            shareMeta: response.data.shareMeta
-          }
-        })
-      } else {
-        resolve({
-          status: "error",
-          message:
-            response.data.status_msg || "Music not found or invalid response"
-        })
-      }
-    } catch (err: any) {
-      resolve({
-        status: "error",
-        message: err.message || "Failed to fetch music detail"
-      })
+): Promise<TiktokMusicDetailResponse> => {
+  try {
+    const musicId = extractMusicId(musicIdOrUrl)
+    if (!musicId) {
+      return { status: "error", message: "Invalid music ID or URL format" }
     }
-  })
+
+    const Tiktok = new TiktokService()
+    const params = _getMusicDetailParams(musicId)
+    const xttparams = Tiktok.generateXTTParams(params)
+
+    const url = new URL(_tiktokGetMusicDetail())
+    url.search = params
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        "User-Agent": webUserAgent,
+        Cookie: Array.isArray(cookie) ? cookie.join("; ") : cookie,
+        "x-tt-params": xttparams
+      },
+      ...createDispatcher(proxy)
+    })
+
+    console.log("Response status:", response.status)
+
+    const responseData = await response.json() as any
+    if (responseData.statusCode === 0 && responseData.musicInfo) {
+      return {
+        status: "success",
+        result: {
+          musicInfo: responseData.musicInfo,
+          shareMeta: responseData.shareMeta
+        }
+      }
+    }
+
+    return {
+      status: "error",
+      message: responseData.status_msg || "Music not found"
+    }
+  } catch (err: any) {
+    return {
+      status: "error",
+      message: err.message || "Failed to fetch music detail"
+    }
+  }
+}

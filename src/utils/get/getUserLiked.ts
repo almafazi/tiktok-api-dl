@@ -1,9 +1,7 @@
-import Axios from "axios"
-import { _tiktokGetUserLiked, _tiktokDesktopUrl } from "../../constants/api"
+import { fetch } from "undici"
+import { _tiktokGetUserLiked } from "../../constants/api"
 import { StalkUser } from "./getProfile"
-import { _getUserLikedParams, _xttParams } from "../../constants/params"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
+import { _getUserLikedParams } from "../../constants/params"
 import { TiktokService } from "../../services/tiktokService"
 import {
   AuthorLiked,
@@ -16,46 +14,29 @@ import {
   ImagesLiked
 } from "../../types/get/getUserLiked"
 import retry from "async-retry"
+import { createDispatcher } from "../proxy"
 
-export const getUserLiked = (
+export const getUserLiked = async (
   username: string,
   cookie: string | any[],
   proxy?: string,
   postLimit?: number
-): Promise<TiktokUserFavoriteVideosResponse> =>
-  new Promise((resolve) => {
-    if (!cookie) {
-      return {
-        status: "error",
-        message: "Cookie is required!"
-      } as TiktokUserFavoriteVideosResponse
-    }
+): Promise<TiktokUserFavoriteVideosResponse> => {
+  const profileRes = await StalkUser(username)
+  if (profileRes.status === "error") {
+    return { status: "error", message: profileRes.message }
+  }
 
-    StalkUser(username).then(async (res) => {
-      if (res.status === "error") {
-        return resolve({
-          status: "error",
-          message: res.message
-        })
-      }
+  const id = profileRes.result.user.uid
+  const secUid = profileRes.result.user.secUid
+  const data = await parseUserLiked(id, secUid, cookie, postLimit, proxy)
 
-      const id = res.result.user.uid
-      const secUid = res.result.user.secUid
-      const data = await parseUserLiked(id, secUid, cookie, postLimit, proxy)
+  if (!data.length) {
+    return { status: "error", message: "No liked videos found!" }
+  }
 
-      if (!data.length)
-        return resolve({
-          status: "error",
-          message: "User not found!"
-        })
-
-      resolve({
-        status: "success",
-        result: data,
-        totalPosts: data.length
-      })
-    })
-  })
+  return { status: "success", result: data, totalPosts: data.length }
+}
 
 const parseUserLiked = async (
   id: string,
@@ -217,26 +198,19 @@ const requestUserLiked = async (
   return await retry(
     async (bail, attempt) => {
       try {
-        const { data } = await Axios.get(url.toString(), {
+        const res = await fetch(url.toString(), {
           headers: {
             "user-agent":
               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35",
             cookie: Array.isArray(cookie) ? cookie.join("; ") : cookie,
             "x-tt-params": xttparams
           },
-          httpsAgent:
-            (proxy &&
-              (proxy.startsWith("http") || proxy.startsWith("https")
-                ? new HttpsProxyAgent(proxy)
-                : proxy.startsWith("socks")
-                ? new SocksProxyAgent(proxy)
-                : undefined)) ||
-            undefined
+          ...createDispatcher(proxy)
         })
 
-        if (data === "") {
-          throw new Error("Empty response")
-        }
+        if (!res.ok) throw new Error(`HTTP error: ${res.status}`)
+        const data = await res.json() as any
+        if (!data) throw new Error("Empty response")
 
         return data
       } catch (error) {

@@ -1,49 +1,22 @@
-import Axios from "axios"
+import { fetch } from "undici"
 import { load } from "cheerio"
 import {
   MusicalDownResponse,
-  GetMusicalDownReuqest
+  GetMusicalDownRequest
 } from "../../types/downloader/musicaldownDownloader"
 import { _musicaldownapi, _musicaldownurl } from "../../constants/api"
-import { HttpsProxyAgent } from "https-proxy-agent"
-import { SocksProxyAgent } from "socks-proxy-agent"
-import { ERROR_MESSAGES } from "../../constants"
+import { ERROR_MESSAGES, TIKTOK_URL_REGEX } from "../../constants"
+import { createDispatcher } from "../proxy"
 type CheerioAPI = ReturnType<typeof load>
 
-/** Constants */
-const TIKTOK_URL_REGEX =
-  /https:\/\/(?:m|t|www|vm|vt|lite)?\.?tiktok\.com\/((?:.*\b(?:(?:usr|v|embed|user|video|photo)\/|\?shareId=|\&item_id=)(\d+))|\w+)/
 const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64; rv:127.0) Gecko/20100101 Firefox/127.0"
-
-/** Types */
-interface ProxyConfig {
-  httpsAgent?: HttpsProxyAgent<string> | SocksProxyAgent
-}
 
 interface RequestForm {
   [key: string]: string
 }
 
-/** Helper Functions */
-const createProxyAgent = (proxy?: string): ProxyConfig => {
-  if (!proxy) return {}
-
-  const isHttpProxy = proxy.startsWith("http") || proxy.startsWith("https")
-  const isSocksProxy = proxy.startsWith("socks")
-
-  if (!isHttpProxy && !isSocksProxy) return {}
-
-  return {
-    httpsAgent: isHttpProxy
-      ? new HttpsProxyAgent(proxy)
-      : new SocksProxyAgent(proxy)
-  }
-}
-
-const validateTikTokUrl = (url: string): boolean => {
-  return TIKTOK_URL_REGEX.test(url)
-}
+const validateTikTokUrl = (url: string): boolean => TIKTOK_URL_REGEX.test(url)
 
 const isValidUrl = (url: string): boolean => {
   try {
@@ -55,11 +28,11 @@ const isValidUrl = (url: string): boolean => {
 }
 
 const extractRequestForm = ($: CheerioAPI, url: string): RequestForm => {
-  const input = $("div > input").map((_, el) => $(el))
+  const input = $("div > input")
   return {
-    [input.get(0).attr("name") || ""]: input.get(0).attr("value") || url,
-    [input.get(1).attr("name") || ""]: input.get(1).attr("value") || "",
-    [input.get(2).attr("name") || ""]: input.get(2).attr("value") || ""
+    [input.eq(0).attr("name") || ""]: input.eq(0).attr("value") || url,
+    [input.eq(1).attr("name") || ""]: input.eq(1).attr("value") || "",
+    [input.eq(2).attr("name") || ""]: input.eq(2).attr("value") || ""
   }
 }
 
@@ -139,7 +112,7 @@ const createVideoResponse = (
 const getRequest = async (
   url: string,
   proxy?: string
-): Promise<GetMusicalDownReuqest> => {
+): Promise<GetMusicalDownRequest> => {
   try {
     if (!validateTikTokUrl(url)) {
       return {
@@ -148,7 +121,7 @@ const getRequest = async (
       }
     }
 
-    const { data, headers } = await Axios(_musicaldownurl, {
+    const res = await fetch(_musicaldownurl, {
       method: "GET",
       headers: {
         Accept:
@@ -156,10 +129,10 @@ const getRequest = async (
         "Update-Insecure-Requests": "1",
         "User-Agent": USER_AGENT
       },
-      ...createProxyAgent(proxy)
+      ...createDispatcher(proxy)
     })
 
-    const cookie = headers["set-cookie"]?.[0]?.split(";")[0]
+    const cookie = res.headers.get("set-cookie")?.split(";")[0]
     if (!cookie) {
       return {
         status: "error",
@@ -167,6 +140,7 @@ const getRequest = async (
       }
     }
 
+    const data = await res.text()
     const $ = load(data)
     const request = extractRequestForm($, url)
 
@@ -203,7 +177,7 @@ export const MusicalDown = async (
       }
     }
 
-    const { data } = await Axios(_musicaldownapi, {
+    const res = await fetch(_musicaldownapi, {
       method: "POST",
       headers: {
         cookie: request.cookie,
@@ -213,10 +187,11 @@ export const MusicalDown = async (
         "Upgrade-Insecure-Requests": "1",
         "User-Agent": USER_AGENT
       },
-      data: new URLSearchParams(Object.entries(request.request)),
-      ...createProxyAgent(proxy)
+      body: new URLSearchParams(Object.entries(request.request ?? {})),
+      ...createDispatcher(proxy)
     })
 
+    const data = await res.text()
     const $ = load(data)
     const images = parseImages($)
 
